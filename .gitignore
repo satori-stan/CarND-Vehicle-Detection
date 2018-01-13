@@ -1,1 +1,4 @@
 training_images/
+colorspaces_test/
+.ipynb_checkpoints/
+ColorSpacesTest.ipynb
