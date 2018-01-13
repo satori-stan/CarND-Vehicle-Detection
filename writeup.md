@@ -15,13 +15,12 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 [image1]: ./output_images/car_not_car.png
-[image2]: ./output_images/HOG_example.jpg
-[image3]: ./examples/sliding_windows.jpg
-[image4]: ./examples/sliding_window.jpg
-[image5]: ./examples/bboxes_and_heat.png
-[image6]: ./examples/labels_map.png
-[image7]: ./examples/output_bboxes.png
-[video1]: ./project_video.mp4
+[image2]: ./output_images/HOG_example.png
+[image3]: ./output_images/sliding_windows.png
+[image4]: ./output_images/bboxes_and_heat.png
+[image5]: ./output_images/labels_map.png
+[image6]: ./output_images/output_bboxes.png
+[video1]: ./project_video_out.mp4
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
 ### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
@@ -43,7 +42,7 @@ I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an 
 
 ![alt text][image1]
 
-The images are read using matplotlib since it outputs an RGB image (the sames format as moviepy, later used to process the video). There is no file to get the labels from, so the images are labelled based on their location in the file system (either inside the 'vehicles' folder or not). A few key values are extracted, like the data type and the maximum value of an image to get a sense of the data we will be working with, as well as the total number of examples per class, to make sure our dataset is balanced.
+The images are read using matplotlib since it outputs an RGB image (the same format as moviepy, later used to process the video). There is no file to get the labels from, so the images are labelled based on their location in the file system (either inside the 'vehicles' folder or not). A few key values are extracted, like the data type and the maximum value of an image to get a sense of the data we will be working with, as well as the total number of examples per class, to make sure our dataset is balanced.
 
 The datasets were then joined and shuffled to attempt to reduce overfitting (cell 3) since some of the training images are in a time series. 
 
@@ -74,15 +73,23 @@ Before training, the dataset is normalized and split 80-20 into train and test s
 
 I based my code on the lesson's code for sliding window with sub-sampling to reduce the overhead of extracting the HOG features on each window. Instead of returning the image with the boxes painted, I am returning the boxes in order to allow for joining the results of more than one search and facilitate the creation of a heatmap. The code to slide the windows is in function `find_cars` in cell 14.
 
-The first step is to standardize the image's values to 0-255 uint8, next the image is cropped to the provided height start and end and color converted. Then, the image is rescaled if a scale different than 1 is defined for the search.
+I tested from one to three searches per image with different cropping (ystart/ystop) values, scale and cells per step (which relates to the amount of overlap). Here are the values I am using:
 
-![alt text][image3]
+| Scale | Y Start | Y Stop | Cells/Step |
+|-------|---------|--------|------------|
+| 3     | 400     | 680    | 12         |
+| 2     | 400     | 600    | 8          |
+| 1     | 380     | 500    | 4          |
+
+The logic for the top and bottom cropping is that closer vehicles are larger so they need a larger space, as the scale of the search becomes smaller, so does the space we need to look in since smaller sized vehicles would only appear closer to the top of the image.
+
+Bigger cars in the video are easier to find, so we can overlap less, as the search window becomes smaller, we need to be more thorough in our search.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
 Ultimately I searched on three scales using YUV single channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
 
-![alt text][image4]
+![alt text][image3]
 
 The way I ended up optimizing the performance was running each search (at different scales) in a separate thread. To do this, I used the ThreadPool class from the multiprocessing standard library. At first, I increased the pixels per cell in the HOG feature extractor, but this produced outlines that were not clear enough and decided to keep the default of 8 (as in the lesson). The improvement didn't become significant until I added more searches and while it is still under the desired speed (I blame it on my hardware), running three searches per frame took as long as running a single search.
 
@@ -94,7 +101,7 @@ I think there is still room for improvement. I am certain that parts of the code
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 
-Here's a [link to my video result](./project_video.mp4). One key thing to consider is that when processing the video, images must first be undistorted, which requires reading in the chessboard images and using `cv2.calibrateCamera` to get an our distortion correction parameters.
+Here's a [link to my video result](./project_video_out.mp4). One key thing to consider is that when processing the video, images must first be undistorted, which requires reading in the chessboard images and using `cv2.calibrateCamera` to get an our distortion correction parameters.
 
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
@@ -105,15 +112,13 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 ### Here are six frames and their corresponding thresholded heatmaps:
 
-![alt text][image5]
+![alt text][image4]
 
 ### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
-![alt text][image6]
+![alt text][image5]
 
 ### Here the resulting bounding boxes are drawn onto the last frame in the series:
-![alt text][image7]
-
-
+![alt text][image6]
 
 ---
 
@@ -121,15 +126,15 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-I have a number of doubts about the usability of the techniques in a real-life scenario. I remember a quote that says that humans are classification machines. We subconciously classify everything we see (the keyword being subconciously) and the procedures used in this project consume quite a lot of resources. That being said, I do understand that the main point is to understand what happens under the hood when we use neural network classifiers.
+I have a number of doubts about the usability of the techniques in a real-life scenario. I remember a quote that says that humans are classification machines. We subconsciously classify everything we see (the keyword being subconsciously) and the procedures used in this project consume quite a lot of resources. That being said, I do understand that the main point is to understand what happens under the hood when we use neural network classifiers.
 
 I would like to explore for example, what happens when we have vehicles that mostly obstruct our view (trucks for instance). For efficiency, we are defining ranges in which to search for vehicles, but it may be the case that one vehicle is all we see.
 
 Also relevant are vehicles on the other side of the road. Not for the main project video, mind you, but at least one of the challenge videos is for a two way road. All the training examples used are for the backs of cars.
 
-Furthermore, in night time situations we may only have head and tail lights to guide us. All the HOG features to tell a car appart by its shape will very much become useless.
+Furthermore, in night time situations we may only have head and tail lights to guide us. All the HOG features to tell a car apart by its shape will very much become useless.
 
 Using more examples to train the classifier would definitively help with identifying other vehicle types and those that are in different directions of travel. It may very well get rid of some of my false positives. Implementing a procedure to read pre-labeled pictures like those in the Udacity datasets would be very valuable indeed. In real life situations I would expect to have a way to mark videoclips for review when a car is unsure of a classification.
 
-Additionally, training an SVM is hard work with figuring out the set of parameters to use. An automatic grid search with 5 variations of each parameter resulted in a search of 24 hours in an AWS instance! That is, even with a three process paralell search it still took a significant amount of time... I couldn't find any parameters to use the GPU instead of the CPU for this calculation. There is an SVM class in TensorFlow, so it might be a better alternative.
+Additionally, training an SVM is hard work with figuring out the set of parameters to use. An automatic grid search with 5 variations of each parameter resulted in a search of 24 hours in an AWS instance! That is, even with a three process parallel search it still took a significant amount of time... I couldn't find any parameters to use the GPU instead of the CPU for this calculation. There is an SVM class in TensorFlow, so it might be a better alternative.
 
